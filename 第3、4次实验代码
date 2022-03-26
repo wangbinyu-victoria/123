@@ -1,0 +1,192 @@
+#include <stdio.h>
+#include <string.h>
+
+typedef struct City {
+    // 城市名称
+    char cityName[20];
+    // 城市的确诊病例Str
+    char num[20];
+    // 城市的确诊病例num
+    int number;
+} City;
+
+typedef struct Area {
+    // 省份
+    char province[20];
+    // 省份下的城市列表
+    City city[100];
+    // 城市的个数
+    int cityLen;
+    // 总确诊数目
+    int allNum;
+} Area;
+// 每行最大长度
+#define LINE_MAX 1024
+Area areas[1000];
+int areaLen = 0;
+
+int getAreaIndex(char province[]) {
+    int i;
+    for (i = 0; i < areaLen; i++) {
+        Area area = areas[i];
+        if (strcmp(province, area.province) == 0) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+int transNum(char str[], int len) {
+    int i;
+    int value = 0;
+    for (i = 0; i < len; i++) {
+        value = value * 10 + (str[i] - '0');
+    }
+    return value;
+}
+
+int readFile(char *path) {
+    FILE *fp;
+    char arguments[10000];
+    fp = fopen(path, "r+");
+    if (!fp) {
+        printf("the file is empty, cannot open it.");
+        return 0;
+    }
+    int index = 0, i;
+    int fileArLen;
+    // 按照行读取文件
+    while (fgets(arguments, LINE_MAX, fp)) {
+        int curIndex = 0;
+        char province[20];
+        char cityName[20];
+        char num[20];
+        fileArLen = strlen(arguments);
+        char tempStr[20];
+        int tempIndex = 0;
+        for (i = 0; i < fileArLen; i++) {
+            // 一行到头
+            if (arguments[i] == '\n') {
+                break;
+            }
+            // tab键分割
+            if (arguments[i] == '\t') {
+                tempStr[tempIndex] = '\0';
+                tempIndex = 0;
+                if (curIndex == 0) {
+                    // 省份信息
+                    strcpy(province, tempStr);
+                } else if (curIndex == 1) {
+                    // 城市信息
+                    strcpy(cityName, tempStr);
+                }
+                curIndex++;
+                continue;
+            }
+            tempStr[tempIndex++] = arguments[i];
+        }
+        // 该城市的数量
+        tempStr[tempIndex++] = '\0';
+        strcpy(num, tempStr);
+        int areaIndex = getAreaIndex(province);
+        if (areaIndex == -1) {
+            // 新省份
+            Area area;
+            area.cityLen = 0;
+            strcpy(area.province, province);
+            City city;
+            strcpy(city.cityName, cityName);
+            strcpy(city.num, num);
+            city.number = transNum(num, strlen(num));
+            area.city[area.cityLen++] = city;
+            area.allNum = area.allNum + city.number;
+            areas[areaLen++] = area;
+        } else {
+            // 省份在之前出现过，直接拿出来，更新该省份下的城市信息
+            City city;
+            strcpy(city.cityName, cityName);
+            strcpy(city.num, num);
+            city.number = transNum(num, strlen(num));
+            areas[areaIndex].city[areas[areaIndex].cityLen++] = city;
+            areas[areaIndex].allNum = areas[areaIndex].allNum + city.number;
+        }
+    }
+    fclose(fp);
+    return index;
+}
+
+void sortArea() {
+    int i, j;
+    for (i = 0; i < areaLen; i++) {
+        int k = i;
+        for (j = i + 1; j < areaLen; j++) {
+            if (areas[k].allNum == areas[j].allNum) {
+                if (strcmp(areas[k].province, areas[j].province) < 0) {
+                    k = j;
+                }
+            } else if (areas[k].allNum < areas[j].allNum) {
+                k = j;
+            }
+        }
+        if (k != i) {
+            Area area = areas[k];
+            areas[k] = areas[i];
+            areas[i] = area;
+        }
+    }
+}
+
+void sortCity() {
+    int i, j, k, z;
+    for (z = 0; z < areaLen; z++) {
+        int len = areas[z].cityLen;
+        for (i = 0; i < len; i++) {
+            k = i;
+            for (j = i + 1; j < len; j++) {
+                if (areas[z].city[k].number == areas[z].city[j].number) {
+                    if (strcmp(areas[z].city[k].cityName, areas[z].city[j].cityName) < 0) {
+                        k = j;
+                    }
+                } else if (areas[z].city[k].number < areas[z].city[j].number) {
+                    k = j;
+                }
+            }
+            if (k != i) {
+                City city = areas[z].city[k];
+                areas[z].city[k] = areas[z].city[i];
+                areas[z].city[i] = city;
+            }
+        }
+    }
+}
+
+int main(int argc, char *argv[]) {
+    char str[20];
+    scanf("%s", str);
+    readFile(str);
+    sortArea();
+    sortCity();
+    int i;
+    FILE *fp;
+    if ((fp = fopen("./yq_out.txt", "wt+")) == NULL) {
+        puts("Fail to open file!");
+        return 1;
+    }
+    for (i = 0; i < areaLen; i++) {
+        Area area = areas[i];
+        int len = area.cityLen;
+        int j;
+//        printf("%s %d\n", area.province, area.allNum);
+        // 输出省份信息
+        fprintf(fp, "%s %d\n", area.province, area.allNum);
+        for (j = 0; j < len; j++) {
+            // 输出该省份下的城市信息
+            City city = area.city[j];
+            fprintf(fp, "%s  %s\n", city.cityName, city.num);
+//            printf("%s  %s\n", city.cityName, city.num);
+        }
+        fprintf(fp, "\n");
+    }
+    fclose(fp);
+    return 0;
+}
